@@ -99,6 +99,3 @@ def main():
         
   
     email_sender.email_template_obj(tabular_table.get_html_string(),recipient_email)
- 
-
-main()
