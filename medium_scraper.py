@@ -14,7 +14,9 @@ import logging as log
 import random
 from bs4 import BeautifulSoup
 import datetime
-from tabulate import tabulate
+from prettytable import PrettyTable
+from email_service import email_sender
+import utils
 
 
 log.basicConfig(level=log.INFO,format='%(levelname)s:%(message)s')
@@ -33,53 +35,15 @@ year : int = 2022
 no_of_artcile : int = 2
 # Number of days 
 no_of_days : int = 1
+# recipients email
+recipient_email : str = 'dineshshazam@gmail.com' 
 
-#! try catch decorator
-def exception_handler(func):
-    def wrapper_func(*args,**kwargs):
-        try:
-            return func(*args,*kwargs)
-        except requests.exceptions.RequestException as e:
-            log.error(f'{func.__name__} API request failed to execute. {e}')
-            sys.exit()
-        except FileNotFoundError as e:
-            log.error(f'{func.__name__} File failed to execute. {e}')
-            sys.exit()
-        except ValueError:
-            log.error(f'{func.__name__} Invalid value format.')
-            sys.exit()
-        except Exception as e:
-            log.error(f'{func.__name__} failed to execute. {e}')
-            sys.exit()
-    
-    return wrapper_func
 
-# get the month and date of the specified no of days
-@exception_handler
-def get_day_month(no_of_days : int) -> tuple[int, int]:
-    month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    m = 0
-    d = 0
-    while no_of_days > 0:
-        d = no_of_days
-        no_of_days -= month_days[m]
-        m += 1
-
-    return (m,d)
-
-@exception_handler
-def get_claps_count(claps_string : str) -> int :
-    if (claps_string == '') or (claps_string is None) or (claps_string.split is None):
-        return 0
-    claps_split = claps_string.split('K')
-    no_of_claps = float(claps_split[0])
-    no_of_claps = int(no_of_claps*1000) if len(claps_split) == 2 else int(no_of_claps)
-    return no_of_claps
-
+@utils.exception_handler
 def main():
-
-    table_data = []
-    col_names = ['Title','Title Description','Article URL', 'Claps', 'Reading Time']
+    tabular_fields = ['Publication','Title','Title Description','Article URL','DATE', 'Claps', 'Reading Time']
+    tabular_table = PrettyTable()
+    tabular_table.field_names = tabular_fields
 
 
     if no_of_artcile > 50:
@@ -91,7 +55,7 @@ def main():
     #* loop through random_no_of_days
     for d in random_no_of_days:     
         #* get the month and date from random_no_of_days 
-        month,day = get_day_month(d)
+        month,day = utils.get_day_month(d)
         date = '{0}-{1:02d}-{2:02d}'.format(year,month,day)
         log.info(f'DATE : {date}')
 
@@ -126,19 +90,15 @@ def main():
                 article_title_desc = title_desc_tag.text
                 article_url = article.find_all('a')[3]['href'].split('?')[0] 
                 claps_tag = article.find('button',class_='button button--chromeless u-baseColor--buttonNormal js-multirecommendCountButton u-disablePointerEvents')
-                article_claps = get_claps_count('' if claps_tag is None else claps_tag.text)
+                article_claps = utils.get_claps_count('' if claps_tag is None else claps_tag.text)
                 article_claps_text = f'{article_claps} claps'
                 article_reading_time = article.find('span',class_='readingTime')
                 article_reading_time = 0 if article_reading_time is None else article_reading_time['title']
         
-                table_data.append([article_title,article_title_desc,article_url,article_claps_text,article_reading_time]) 
+                tabular_table.add_row([publication,article_title,article_title_desc,article_url,date,article_claps_text,article_reading_time]) 
         
-        #display table
-        print(tabulate(table_data, headers=col_names))
-            # with open(f'{publication}.html',mode='w',encoding='utf-8') as file:
-            #     file.write(str(f'title_desc:[{title_desc}]')) 
-
-       
+  
+    email_sender.email_template_obj(tabular_table.get_html_string(),recipient_email)
+ 
 
 main()
-    
